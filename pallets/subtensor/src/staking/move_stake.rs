@@ -1,6 +1,7 @@
 use super::*;
 use safe_math::*;
 use sp_core::Get;
+use sp_runtime::Permill;
 use substrate_fixed::types::U64F64;
 use subtensor_runtime_common::{AlphaBalance, NetUid, TaoBalance, Token};
 use subtensor_swap_interface::SwapHandler;
@@ -51,6 +52,7 @@ impl<T: Config> Pallet<T> {
             None,
             false,
             true,
+            None,
         )?;
 
         // Log the event.
@@ -142,6 +144,7 @@ impl<T: Config> Pallet<T> {
             None,
             true,
             false,
+            None,
         )?;
 
         // 9. Emit an event for logging/monitoring.
@@ -190,6 +193,7 @@ impl<T: Config> Pallet<T> {
         origin_netuid: NetUid,
         destination_netuid: NetUid,
         alpha_amount: AlphaBalance,
+        fee: Option<(T::AccountId, Permill)>,
     ) -> dispatch::DispatchResult {
         // Ensure the extrinsic is signed by the coldkey.
         let coldkey = ensure_signed(origin)?;
@@ -207,6 +211,7 @@ impl<T: Config> Pallet<T> {
             None,
             false,
             true,
+            fee,
         )?;
 
         // Emit an event for logging.
@@ -275,6 +280,7 @@ impl<T: Config> Pallet<T> {
             Some(allow_partial),
             false,
             true,
+            None,
         )?;
 
         // Emit an event for logging.
@@ -307,6 +313,7 @@ impl<T: Config> Pallet<T> {
         maybe_allow_partial: Option<bool>,
         check_transfer_toggle: bool,
         set_limit: bool,
+        fee: Option<(T::AccountId, Permill)>,
     ) -> Result<TaoBalance, DispatchError> {
         // Cap the alpha_amount at available Alpha because user might be paying transaxtion fees
         // in Alpha and their total is already reduced by now.
@@ -370,10 +377,14 @@ impl<T: Config> Pallet<T> {
                 Self::transfer_tao(origin_coldkey, destination_coldkey, tao_unstaked)?;
             }
 
+            // Deduct optional fee from the intermediate TAO before restaking.
+            let tao_after_fee: TaoBalance =
+                Self::deduct_tao_fee(destination_coldkey, tao_unstaked.into(), fee)?.into();
+
             // Stake the unstaked amount into the destination.
             // Because of the fee, the tao_unstaked may be too low if initial stake is low. In that case,
             // do not restake.
-            if tao_unstaked >= DefaultMinStake::<T>::get() {
+            if tao_after_fee >= DefaultMinStake::<T>::get() {
                 // If the coldkey is not the owner, make the hotkey a delegate.
                 if Self::get_owning_coldkey_for_hotkey(destination_hotkey) != *destination_coldkey {
                     Self::maybe_become_delegate(destination_hotkey);
@@ -383,14 +394,14 @@ impl<T: Config> Pallet<T> {
                     destination_hotkey,
                     destination_coldkey,
                     destination_netuid,
-                    tao_unstaked,
+                    tao_after_fee,
                     T::SwapInterface::max_price(),
                     set_limit,
                     drop_fee_destination,
                 )?;
             }
 
-            Ok(tao_unstaked)
+            Ok(tao_after_fee)
         } else {
             Self::transfer_stake_within_subnet(
                 origin_coldkey,

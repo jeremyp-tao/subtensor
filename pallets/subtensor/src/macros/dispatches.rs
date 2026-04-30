@@ -1592,6 +1592,7 @@ mod dispatches {
                 origin_netuid,
                 destination_netuid,
                 alpha_amount,
+                None,
             )
         }
 
@@ -2573,6 +2574,29 @@ mod dispatches {
                 hotkey,
                 netuid,
                 amount_unstaked,
+                Some((fee_recipient, fee_percentage)),
+            )
+        }
+
+        /// --- Swaps stake between subnets for the same (coldkey, hotkey), deducting a fee in TAO
+        /// from the intermediate amount and sending it to the fee recipient.
+        #[pallet::call_index(138)]
+        #[pallet::weight(<T as crate::pallet::Config>::WeightInfo::swap_stake())]
+        pub fn swap_stake_with_fee(
+            origin: OriginFor<T>,
+            hotkey: T::AccountId,
+            origin_netuid: NetUid,
+            destination_netuid: NetUid,
+            alpha_amount: AlphaBalance,
+            fee_recipient: T::AccountId,
+            fee_percentage: sp_runtime::Permill,
+        ) -> DispatchResult {
+            Self::do_swap_stake(
+                origin,
+                hotkey,
+                origin_netuid,
+                destination_netuid,
+                alpha_amount,
                 Some((fee_recipient, fee_percentage)),
             )
         }

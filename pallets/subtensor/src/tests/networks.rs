@@ -753,13 +753,15 @@ fn destroy_alpha_out_multiple_stakers_pro_rata() {
             RuntimeOrigin::signed(c1),
             h1,
             netuid,
-            s1.into()
+            s1.into(),
+            None,
         ));
         assert_ok!(SubtensorModule::do_add_stake(
             RuntimeOrigin::signed(c2),
             h2,
             netuid,
-            s2.into()
+            s2.into(),
+            None,
         ));
 
         // 4. α-out snapshot
@@ -864,7 +866,8 @@ fn destroy_alpha_out_many_stakers_complex_distribution() {
                 RuntimeOrigin::signed(cold[i]),
                 hot[i],
                 netuid,
-                stake[i].into()
+                stake[i].into(),
+                None,
             ));
         }
 
@@ -1927,13 +1930,15 @@ fn massive_dissolve_refund_and_reregistration_flow_is_lossless_and_cleans_state(
                     RuntimeOrigin::signed(cold),
                     hot1,
                     net,
-                    stake1.into()
+                    stake1.into(),
+                    None,
                 ));
                 assert_ok!(SubtensorModule::do_add_stake(
                     RuntimeOrigin::signed(cold),
                     hot2,
                     net,
-                    stake2.into()
+                    stake2.into(),
+                    None,
                 ));
             }
         }
@@ -2132,7 +2137,8 @@ fn massive_dissolve_refund_and_reregistration_flow_is_lossless_and_cleans_state(
                 RuntimeOrigin::signed(cold),
                 hot1,
                 net_new,
-                min_amount_required.into()
+                min_amount_required.into(),
+                None,
             ));
 
             let after_tao = SubtensorModule::get_coldkey_balance(&cold);

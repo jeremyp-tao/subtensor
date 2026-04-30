@@ -83,12 +83,7 @@ impl<T: Config> Pallet<T> {
         )?;
 
         // 4. Deduct fee from TAO output if requested.
-        if let Some((fee_recipient, fee_percentage)) = fee {
-            let fee_amount: u64 = fee_percentage * u64::from(tao_unstaked);
-            if fee_amount > 0 {
-                Self::transfer_tao(&coldkey, &fee_recipient, fee_amount.into())?;
-            }
-        }
+        Self::deduct_tao_fee(&coldkey, tao_unstaked.into(), fee)?;
 
         // 5. If the stake is below the minimum, we clear the nomination from storage.
         Self::clear_small_nomination_if_required(&hotkey, &coldkey, netuid);

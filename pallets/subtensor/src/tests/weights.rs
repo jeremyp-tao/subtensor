@@ -131,7 +131,8 @@ fn test_commit_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            min_stake.into()
+            min_stake.into(),
+            None,
         ));
         let min_stake_with_slippage = SubtensorModule::get_total_stake_for_hotkey(&hotkey);
 
@@ -179,7 +180,8 @@ fn test_commit_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            DefaultMinStake::<Test>::get() * 10.into()
+            DefaultMinStake::<Test>::get() * 10.into(),
+            None,
         ));
 
         // Verify stake is more than minimum
@@ -291,7 +293,8 @@ fn test_set_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            min_stake + fee
+            min_stake + fee,
+            None,
         ));
         let min_stake_with_slippage = SubtensorModule::get_total_stake_for_hotkey(&hotkey);
 
@@ -395,7 +398,8 @@ fn test_reveal_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            min_stake + fee.into()
+            min_stake + fee.into(),
+            None,
         ));
 
         // Verify stake is equal to minimum
@@ -467,7 +471,8 @@ fn test_reveal_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            DefaultMinStake::<Test>::get() * 10.into()
+            DefaultMinStake::<Test>::get() * 10.into(),
+            None,
         ));
 
         // Verify stake is more than minimum
@@ -578,7 +583,8 @@ fn test_batch_reveal_weights_validate() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            min_stake
+            min_stake,
+            None,
         ));
 
         // Verify stake is now sufficient
@@ -791,14 +797,16 @@ fn test_set_stake_threshold_failed() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            19_000_000_000_000_u64.into()
+            19_000_000_000_000_u64.into(),
+            None,
         ));
         assert!(!SubtensorModule::check_weights_min_stake(&hotkey, netuid));
         assert_ok!(SubtensorModule::do_add_stake(
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            20_000_000_000_000_u64.into()
+            20_000_000_000_000_u64.into(),
+            None,
         ));
         assert!(SubtensorModule::check_weights_min_stake(&hotkey, netuid));
 
@@ -819,7 +827,8 @@ fn test_set_stake_threshold_failed() {
             RuntimeOrigin::signed(hotkey),
             hotkey,
             netuid,
-            100_000_000_000_000_u64.into()
+            100_000_000_000_000_u64.into(),
+            None,
         ));
         assert_ok!(SubtensorModule::set_weights(
             RuntimeOrigin::signed(hotkey),

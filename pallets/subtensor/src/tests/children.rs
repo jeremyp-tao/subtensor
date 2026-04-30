@@ -2246,7 +2246,8 @@ fn test_do_remove_stake_clears_pending_childkeys() {
             RuntimeOrigin::signed(coldkey),
             hotkey,
             netuid,
-            (StakeThreshold::<Test>::get() * 2).into()
+            (StakeThreshold::<Test>::get() * 2).into(),
+            None,
         ));
 
         let alpha =
@@ -2278,6 +2279,7 @@ fn test_do_remove_stake_clears_pending_childkeys() {
             hotkey,
             netuid,
             alpha,
+            None,
         ));
 
         // Assert that pending child is removed

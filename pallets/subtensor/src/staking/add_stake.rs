@@ -64,14 +64,7 @@ impl<T: Config> Pallet<T> {
         )?;
 
         // 3. Deduct fee from TAO input if requested.
-        let mut tao_to_stake: u64 = stake_to_be_added.into();
-        if let Some((fee_recipient, fee_percentage)) = fee {
-            let fee_amount: u64 = fee_percentage * tao_to_stake;
-            if fee_amount > 0 {
-                Self::transfer_tao(&coldkey, &fee_recipient, fee_amount.into())?;
-                tao_to_stake = tao_to_stake.saturating_sub(fee_amount);
-            }
-        }
+        let tao_to_stake: u64 = Self::deduct_tao_fee(&coldkey, stake_to_be_added.into(), fee)?;
 
         // 4. Swap the stake into alpha on the subnet and increase counters.
         // Emit the staking event.

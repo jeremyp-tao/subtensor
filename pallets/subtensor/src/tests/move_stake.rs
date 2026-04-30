@@ -1247,6 +1247,7 @@ fn test_do_swap_success() {
             origin_netuid,
             destination_netuid,
             alpha_before,
+            None,
         ));
 
         assert_eq!(
@@ -1285,7 +1286,8 @@ fn test_do_swap_nonexistent_subnet() {
                 hotkey,
                 nonexistent_netuid1,
                 nonexistent_netuid2,
-                stake_amount.into()
+                stake_amount.into(),
+                None,
             ),
             Error::<Test>::SubnetNotExists
         );
@@ -1310,7 +1312,8 @@ fn test_do_swap_nonexistent_hotkey() {
                 nonexistent_hotkey,
                 netuid1,
                 netuid2,
-                stake_amount.into()
+                stake_amount.into(),
+                None,
             ),
             Error::<Test>::HotKeyAccountNotExists
         );
@@ -1348,7 +1351,8 @@ fn test_do_swap_insufficient_stake() {
             hotkey,
             netuid1,
             netuid2,
-            attempted_swap.into()
+            attempted_swap.into(),
+            None,
         ));
     });
 }
@@ -1385,7 +1389,8 @@ fn test_do_swap_wrong_origin() {
                 hotkey,
                 netuid1,
                 netuid2,
-                stake_amount.into()
+                stake_amount.into(),
+                None,
             ),
             Error::<Test>::AmountTooLow
         );
@@ -1424,7 +1429,8 @@ fn test_do_swap_minimum_stake_check() {
                 hotkey,
                 netuid1,
                 netuid2,
-                swap_amount.into()
+                swap_amount.into(),
+                None,
             ),
             Error::<Test>::AmountTooLow
         );
@@ -1464,7 +1470,8 @@ fn test_do_swap_same_subnet() {
                 hotkey,
                 netuid,
                 netuid,
-                alpha_before
+                alpha_before,
+                None,
             ),
             DispatchError::from(Error::<Test>::SameNetuid)
         );
@@ -1515,6 +1522,7 @@ fn test_do_swap_partial_stake() {
             origin_netuid,
             destination_netuid,
             swap_amount,
+            None,
         ));
 
         assert_abs_diff_eq!(
@@ -1566,7 +1574,8 @@ fn test_do_swap_storage_updates() {
             hotkey,
             origin_netuid,
             destination_netuid,
-            alpha
+            alpha,
+            None,
         ));
 
         assert_eq!(
@@ -1627,7 +1636,8 @@ fn test_do_swap_multiple_times() {
                     hotkey,
                     netuid1,
                     netuid2,
-                    alpha1
+                    alpha1,
+                    None,
                 ));
             }
             let alpha2 = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
@@ -1643,7 +1653,8 @@ fn test_do_swap_multiple_times() {
                     hotkey,
                     netuid2,
                     netuid1,
-                    alpha2
+                    alpha2,
+                    None,
                 ));
             }
         }
@@ -1698,6 +1709,7 @@ fn test_do_swap_allows_non_owned_hotkey() {
             origin_netuid,
             destination_netuid,
             alpha_before,
+            None,
         ));
     });
 }
@@ -1936,7 +1948,8 @@ fn test_swap_stake_limits_destination_netuid() {
             hotkey,
             netuid,
             netuid2,
-            alpha
+            alpha,
+            None,
         ),);
 
         assert!(!StakingOperationRateLimiter::<Test>::contains_key((

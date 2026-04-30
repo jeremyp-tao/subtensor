@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
 use safe_math::*;
 use share_pool::SafeFloat;
+use sp_runtime::Permill;
 use substrate_fixed::types::U96F32;
 use subtensor_runtime_common::{NetUid, TaoBalance};
 use subtensor_swap_interface::{Order, SwapHandler};
@@ -278,6 +279,23 @@ impl<T: Config> Pallet<T> {
         for ((hotkey, coldkey, netuid), _) in Self::alpha_iter() {
             Self::clear_small_nomination_if_required(&hotkey, &coldkey, netuid);
         }
+    }
+
+    /// Deduct an optional TAO fee from `amount` by transferring it from `source` to the
+    /// recipient. Returns the remaining amount available to the caller.
+    pub fn deduct_tao_fee(
+        source: &T::AccountId,
+        amount: u64,
+        fee: Option<(T::AccountId, Permill)>,
+    ) -> Result<u64, DispatchError> {
+        let Some((fee_recipient, fee_percentage)) = fee else {
+            return Ok(amount);
+        };
+        let fee_amount: u64 = fee_percentage * amount;
+        if fee_amount > 0 {
+            Self::transfer_tao(source, &fee_recipient, fee_amount.into())?;
+        }
+        Ok(amount.saturating_sub(fee_amount))
     }
 
     pub fn is_user_liquidity_enabled(netuid: NetUid) -> bool {

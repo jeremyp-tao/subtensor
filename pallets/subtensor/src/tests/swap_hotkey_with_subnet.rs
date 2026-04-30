@@ -2827,6 +2827,7 @@ fn test_revert_hotkey_swap_with_revert_stake_the_same() {
             hk1,
             netuid_1,
             stake_ck4.into(),
+            None,
         )
         .unwrap();
 
