@@ -3,7 +3,7 @@
 
 use approx::assert_abs_diff_eq;
 use frame_support::dispatch::{DispatchClass, GetDispatchInfo, Pays};
-use frame_support::sp_runtime::DispatchError;
+use frame_support::sp_runtime::{DispatchError, Permill};
 use frame_support::{assert_err, assert_noop, assert_ok, traits::Currency};
 use frame_system::RawOrigin;
 use pallet_subtensor_swap::tick::TickIndex;
@@ -5987,5 +5987,131 @@ fn test_sharepool_dataops_try_get_value_returns_err_on_non_existing_v2() {
         let share_pool = SubtensorModule::get_alpha_share_pool(hotkey, netuid);
         let maybe_actual_value = share_pool.try_get_value(&coldkey);
         assert!(maybe_actual_value.is_err());
+    });
+}
+
+#[test]
+fn test_add_stake_with_fee_ok() {
+    new_test_ext(1).execute_with(|| {
+        let hotkey = U256::from(533453);
+        let coldkey = U256::from(55453);
+        let fee_recipient = U256::from(99999);
+        let amount = DefaultMinStake::<Test>::get().to_u64() * 10;
+        let fee_pct = Permill::from_percent(10);
+        let expected_fee = fee_pct * amount;
+        let amount_after_fee = amount - expected_fee;
+
+        let netuid = add_dynamic_network(&hotkey, &coldkey);
+        remove_owner_registration_stake(netuid);
+        mock::setup_reserves(
+            netuid,
+            (amount * 1_000_000).into(),
+            (amount * 10_000_000).into(),
+        );
+
+        SubtensorModule::add_balance_to_coldkey_account(&coldkey, amount.into());
+        let fee_recipient_before = SubtensorModule::get_coldkey_balance(&fee_recipient);
+
+        // Expected alpha if only `amount_after_fee` were staked through the swap.
+        let (alpha_expected, _) =
+            mock::swap_tao_to_alpha(netuid, TaoBalance::from(amount_after_fee));
+
+        let stake_before = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey, &coldkey, netuid,
+        );
+
+        assert_ok!(SubtensorModule::add_stake_with_fee(
+            RuntimeOrigin::signed(coldkey),
+            hotkey,
+            netuid,
+            amount.into(),
+            fee_recipient,
+            fee_pct,
+        ));
+
+        // Fee recipient credited with the fee amount.
+        assert_eq!(
+            SubtensorModule::get_coldkey_balance(&fee_recipient),
+            fee_recipient_before + expected_fee.into(),
+        );
+
+        // Hotkey stake increased based on post-fee TAO.
+        let stake_after = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey, &coldkey, netuid,
+        );
+        assert_abs_diff_eq!(
+            stake_after - stake_before,
+            alpha_expected,
+            epsilon = 10000.into(),
+        );
+    });
+}
+
+#[test]
+fn test_remove_stake_with_fee_ok() {
+    new_test_ext(1).execute_with(|| {
+        let subnet_owner_coldkey = U256::from(1);
+        let subnet_owner_hotkey = U256::from(2);
+        let coldkey = U256::from(4343);
+        let hotkey = U256::from(4968585);
+        let fee_recipient = U256::from(77777);
+        let amount = DefaultMinStake::<Test>::get() * 10.into();
+        let fee_pct = Permill::from_percent(10);
+
+        let netuid = add_dynamic_network(&subnet_owner_hotkey, &subnet_owner_coldkey);
+        register_ok_neuron(netuid, hotkey, coldkey, 192213123);
+
+        let existing = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey, &coldkey, netuid,
+        );
+        if !existing.is_zero() {
+            SubtensorModule::decrease_stake_for_hotkey_and_coldkey_on_subnet(
+                &hotkey, &coldkey, netuid, existing,
+            );
+        }
+        SubtensorModule::increase_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey,
+            &coldkey,
+            netuid,
+            amount.to_u64().into(),
+        );
+
+        // Top up subnet TAO so remove_stake can pay out.
+        let (tao_unstaked, swap_fee) =
+            mock::swap_alpha_to_tao(netuid, amount.to_u64().into());
+        SubnetTAO::<Test>::mutate(netuid, |v| *v += tao_unstaked + swap_fee.into());
+        TotalStake::<Test>::mutate(|v| *v += tao_unstaked + swap_fee.into());
+
+        let coldkey_before = SubtensorModule::get_coldkey_balance(&coldkey);
+        let fee_recipient_before = SubtensorModule::get_coldkey_balance(&fee_recipient);
+
+        assert_ok!(SubtensorModule::remove_stake_with_fee(
+            RuntimeOrigin::signed(coldkey),
+            hotkey,
+            netuid,
+            amount.to_u64().into(),
+            fee_recipient,
+            fee_pct,
+        ));
+
+        let coldkey_gain =
+            SubtensorModule::get_coldkey_balance(&coldkey) - coldkey_before;
+        let fee_gain =
+            SubtensorModule::get_coldkey_balance(&fee_recipient) - fee_recipient_before;
+
+        // Fee + coldkey credit must equal the unstaked TAO (modulo slippage epsilon).
+        assert_abs_diff_eq!(
+            coldkey_gain + fee_gain,
+            tao_unstaked,
+            epsilon = (tao_unstaked.to_u64() / 1000).into(),
+        );
+
+        // Fee gain should be ~10% of the combined payout.
+        let total_payout: u64 = (coldkey_gain + fee_gain).into();
+        assert_abs_diff_eq!(
+            fee_gain,
+            (fee_pct * total_payout).into(),
+            epsilon = 2.into(),
+        );
     });
 }

@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
 use approx::assert_abs_diff_eq;
+use frame_support::sp_runtime::Permill;
 use frame_support::{assert_err, assert_noop, assert_ok};
 use sp_core::{Get, U256};
 use substrate_fixed::types::{U64F64, U96F32};
@@ -1963,5 +1964,85 @@ fn test_swap_stake_limits_destination_netuid() {
             origin_coldkey,
             netuid2
         )));
+    });
+}
+
+#[test]
+fn test_swap_stake_with_fee_ok() {
+    new_test_ext(1).execute_with(|| {
+        let subnet_owner_coldkey = U256::from(1001);
+        let subnet_owner_hotkey = U256::from(1002);
+        let origin_netuid = add_dynamic_network(&subnet_owner_hotkey, &subnet_owner_coldkey);
+        let destination_netuid = add_dynamic_network(&subnet_owner_hotkey, &subnet_owner_coldkey);
+
+        let coldkey = U256::from(1);
+        let hotkey = U256::from(2);
+        let fee_recipient = U256::from(33333);
+        let stake_amount = DefaultMinStake::<Test>::get().to_u64() * 10;
+        let fee_pct = Permill::from_percent(10);
+
+        let _ = SubtensorModule::create_account_if_non_existent(&coldkey, &hotkey);
+        add_balance_to_coldkey_account(&coldkey, (stake_amount * 2).into());
+        SubtensorModule::stake_into_subnet(
+            &hotkey,
+            &coldkey,
+            origin_netuid,
+            stake_amount.into(),
+            <Test as Config>::SwapInterface::max_price(),
+            false,
+            false,
+        )
+        .unwrap();
+
+        let alpha_before = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey,
+            &coldkey,
+            origin_netuid,
+        );
+
+        // Intermediate TAO from origin → TAO (drop_fees=true matches transition_stake_internal).
+        let (tao_intermediate, _) =
+            mock::swap_alpha_to_tao_ext(origin_netuid, alpha_before, true);
+        let expected_fee: u64 = fee_pct * tao_intermediate.to_u64();
+        let tao_after_fee = tao_intermediate.to_u64() - expected_fee;
+        let (expected_alpha, _) =
+            mock::swap_tao_to_alpha(destination_netuid, tao_after_fee.into());
+
+        let fee_recipient_before = SubtensorModule::get_coldkey_balance(&fee_recipient);
+
+        assert_ok!(SubtensorModule::swap_stake_with_fee(
+            RuntimeOrigin::signed(coldkey),
+            hotkey,
+            origin_netuid,
+            destination_netuid,
+            alpha_before,
+            fee_recipient,
+            fee_pct,
+        ));
+
+        // Origin subnet drained.
+        assert_eq!(
+            SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+                &hotkey,
+                &coldkey,
+                origin_netuid,
+            ),
+            AlphaBalance::ZERO,
+        );
+
+        // Fee recipient credited (epsilon accounts for swap-simulation drift).
+        assert_abs_diff_eq!(
+            SubtensorModule::get_coldkey_balance(&fee_recipient),
+            fee_recipient_before + expected_fee.into(),
+            epsilon = 2000.into(),
+        );
+
+        // Destination stake matches the swap of the post-fee TAO.
+        let alpha_after = SubtensorModule::get_stake_for_hotkey_and_coldkey_on_subnet(
+            &hotkey,
+            &coldkey,
+            destination_netuid,
+        );
+        assert_abs_diff_eq!(alpha_after, expected_alpha, epsilon = 1000.into());
     });
 }
