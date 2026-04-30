@@ -2044,5 +2044,17 @@ fn test_swap_stake_with_fee_ok() {
             destination_netuid,
         );
         assert_abs_diff_eq!(alpha_after, expected_alpha, epsilon = 1000.into());
+
+        // StakeFeePaid event emitted for the intermediate-TAO fee.
+        let fee_gain = SubtensorModule::get_coldkey_balance(&fee_recipient)
+            - fee_recipient_before;
+        assert!(System::events().iter().any(|e| matches!(
+            &e.event,
+            RuntimeEvent::SubtensorModule(Event::StakeFeePaid {
+                coldkey: c,
+                fee_recipient: r,
+                amount,
+            }) if *c == coldkey && *r == fee_recipient && *amount == fee_gain
+        )));
     });
 }

@@ -283,6 +283,7 @@ impl<T: Config> Pallet<T> {
 
     /// Deduct an optional TAO fee from `amount` by transferring it from `source` to the
     /// recipient. Returns the remaining amount available to the caller.
+    /// Emits `StakeFeePaid` when a non-zero fee is transferred.
     pub fn deduct_tao_fee(
         source: &T::AccountId,
         amount: u64,
@@ -294,6 +295,11 @@ impl<T: Config> Pallet<T> {
         let fee_amount: u64 = fee_percentage * amount;
         if fee_amount > 0 {
             Self::transfer_tao(source, &fee_recipient, fee_amount.into())?;
+            Self::deposit_event(Event::StakeFeePaid {
+                coldkey: source.clone(),
+                fee_recipient,
+                amount: fee_amount.into(),
+            });
         }
         Ok(amount.saturating_sub(fee_amount))
     }

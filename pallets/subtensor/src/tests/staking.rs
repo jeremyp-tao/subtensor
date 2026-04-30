@@ -6009,7 +6009,7 @@ fn test_add_stake_with_fee_ok() {
             (amount * 10_000_000).into(),
         );
 
-        SubtensorModule::add_balance_to_coldkey_account(&coldkey, amount.into());
+        add_balance_to_coldkey_account(&coldkey, amount.into());
         let fee_recipient_before = SubtensorModule::get_coldkey_balance(&fee_recipient);
 
         // Expected alpha if only `amount_after_fee` were staked through the swap.
@@ -6044,6 +6044,16 @@ fn test_add_stake_with_fee_ok() {
             alpha_expected,
             epsilon = 10000.into(),
         );
+
+        // StakeFeePaid event emitted with the expected payload.
+        assert!(System::events().iter().any(|e| matches!(
+            &e.event,
+            RuntimeEvent::SubtensorModule(Event::StakeFeePaid {
+                coldkey: c,
+                fee_recipient: r,
+                amount,
+            }) if *c == coldkey && *r == fee_recipient && *amount == expected_fee.into()
+        )));
     });
 }
 
@@ -6113,5 +6123,15 @@ fn test_remove_stake_with_fee_ok() {
             (fee_pct * total_payout).into(),
             epsilon = 2.into(),
         );
+
+        // StakeFeePaid event emitted (amount matches actual fee gain).
+        assert!(System::events().iter().any(|e| matches!(
+            &e.event,
+            RuntimeEvent::SubtensorModule(Event::StakeFeePaid {
+                coldkey: c,
+                fee_recipient: r,
+                amount,
+            }) if *c == coldkey && *r == fee_recipient && *amount == fee_gain
+        )));
     });
 }

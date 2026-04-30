@@ -572,5 +572,15 @@ mod events {
             /// Whether delegation is now enabled.
             enabled: bool,
         },
+
+        /// A TAO fee was paid as part of an `*_with_fee` staking extrinsic.
+        StakeFeePaid {
+            /// Coldkey that originated the staking operation.
+            coldkey: T::AccountId,
+            /// Recipient credited with the fee.
+            fee_recipient: T::AccountId,
+            /// Fee amount in TAO.
+            amount: TaoBalance,
+        },
     }
 }
