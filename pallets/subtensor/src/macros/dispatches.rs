@@ -701,7 +701,7 @@ mod dispatches {
             netuid: NetUid,
             amount_staked: TaoBalance,
         ) -> DispatchResult {
-            Self::do_add_stake(origin, hotkey, netuid, amount_staked).map(|_| ())
+            Self::do_add_stake(origin, hotkey, netuid, amount_staked, None).map(|_| ())
         }
 
         /// Remove stake from the staking account. The call must be made
@@ -743,7 +743,7 @@ mod dispatches {
             netuid: NetUid,
             amount_unstaked: AlphaBalance,
         ) -> DispatchResult {
-            Self::do_remove_stake(origin, hotkey, netuid, amount_unstaked)
+            Self::do_remove_stake(origin, hotkey, netuid, amount_unstaked, None)
         }
 
         /// Serves or updates axon /prometheus information for the neuron associated with the caller. If the caller is
@@ -2530,6 +2530,51 @@ mod dispatches {
 
             Self::deposit_event(Event::AutoParentDelegationEnabledSet { hotkey, enabled });
             Ok(())
+        }
+
+        /// --- Adds stake to a hotkey account, deducting a fee in TAO from the input
+        /// amount and sending it to the fee recipient.
+        #[pallet::call_index(136)]
+        #[pallet::weight(<T as crate::pallet::Config>::WeightInfo::add_stake())]
+        pub fn add_stake_with_fee(
+            origin: OriginFor<T>,
+            hotkey: T::AccountId,
+            netuid: NetUid,
+            amount_staked: TaoBalance,
+            fee_recipient: T::AccountId,
+            fee_percentage: sp_runtime::Permill,
+        ) -> DispatchResult {
+            Self::do_add_stake(
+                origin,
+                hotkey,
+                netuid,
+                amount_staked,
+                Some((fee_recipient, fee_percentage)),
+            )
+            .map(|_| ())
+        }
+
+        /// --- Removes stake from a hotkey account, deducting a fee in TAO from the output
+        /// amount and sending it to the fee recipient.
+        #[pallet::call_index(137)]
+        #[pallet::weight((Weight::from_parts(196_800_000, 0)
+		.saturating_add(T::DbWeight::get().reads(19))
+		.saturating_add(T::DbWeight::get().writes(10)), DispatchClass::Normal, Pays::Yes))]
+        pub fn remove_stake_with_fee(
+            origin: OriginFor<T>,
+            hotkey: T::AccountId,
+            netuid: NetUid,
+            amount_unstaked: AlphaBalance,
+            fee_recipient: T::AccountId,
+            fee_percentage: sp_runtime::Permill,
+        ) -> DispatchResult {
+            Self::do_remove_stake(
+                origin,
+                hotkey,
+                netuid,
+                amount_unstaked,
+                Some((fee_recipient, fee_percentage)),
+            )
         }
     }
 }

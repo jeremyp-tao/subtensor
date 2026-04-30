@@ -139,7 +139,7 @@ impl<T: Config> Pallet<T> {
         let alpha = if let Some(limit) = limit {
             Self::do_add_stake_limit(origin.clone(), hotkey.clone(), netuid, amount, limit, false)?
         } else {
-            Self::do_add_stake(origin.clone(), hotkey.clone(), netuid, amount)?
+            Self::do_add_stake(origin.clone(), hotkey.clone(), netuid, amount, None)?
         };
 
         Self::do_burn_alpha(origin, hotkey.clone(), alpha, netuid)?;

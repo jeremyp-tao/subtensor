@@ -1,3 +1,4 @@
+use sp_runtime::Permill;
 use subtensor_runtime_common::{NetUid, TaoBalance};
 use subtensor_swap_interface::{Order, SwapHandler};
 
@@ -18,6 +19,9 @@ impl<T: Config> Pallet<T> {
     ///
     /// * 'stake_to_be_added' (u64):
     ///     -  The amount of stake to be added to the hotkey staking account.
+    ///
+    /// * 'fee' (Option<(T::AccountId, Permill)>):
+    ///     -  Optional fee recipient and percentage. Fee is deducted in TAO from the input before the swap.
     ///
     /// # Event:
     /// * StakeAdded;
@@ -41,6 +45,7 @@ impl<T: Config> Pallet<T> {
         hotkey: T::AccountId,
         netuid: NetUid,
         stake_to_be_added: TaoBalance,
+        fee: Option<(T::AccountId, Permill)>,
     ) -> Result<AlphaBalance, DispatchError> {
         // 1. We check that the transaction is signed by the caller and retrieve the T::AccountId coldkey information.
         let coldkey = ensure_signed(origin)?;
@@ -58,13 +63,23 @@ impl<T: Config> Pallet<T> {
             false,
         )?;
 
-        // 3. Swap the stake into alpha on the subnet and increase counters.
+        // 3. Deduct fee from TAO input if requested.
+        let mut tao_to_stake: u64 = stake_to_be_added.into();
+        if let Some((fee_recipient, fee_percentage)) = fee {
+            let fee_amount: u64 = fee_percentage * tao_to_stake;
+            if fee_amount > 0 {
+                Self::transfer_tao(&coldkey, &fee_recipient, fee_amount.into())?;
+                tao_to_stake = tao_to_stake.saturating_sub(fee_amount);
+            }
+        }
+
+        // 4. Swap the stake into alpha on the subnet and increase counters.
         // Emit the staking event.
         Self::stake_into_subnet(
             &hotkey,
             &coldkey,
             netuid,
-            stake_to_be_added,
+            tao_to_stake.into(),
             T::SwapInterface::max_price(),
             true,
             false,

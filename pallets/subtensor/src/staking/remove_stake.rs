@@ -1,4 +1,5 @@
 use super::*;
+use sp_runtime::Permill;
 use substrate_fixed::types::U96F32;
 use subtensor_runtime_common::{AlphaBalance, NetUid, TaoBalance, Token};
 use subtensor_swap_interface::{Order, SwapHandler};
@@ -18,6 +19,9 @@ impl<T: Config> Pallet<T> {
     ///
     /// * 'alpha_unstaked' (Alpha):
     ///     -  The amount of stake to be removed from the staking account.
+    ///
+    /// * 'fee' (Option<(T::AccountId, Permill)>):
+    ///     -  Optional fee recipient and percentage. Fee is deducted in TAO from the output after the swap.
     ///
     /// # Event:
     /// * StakeRemoved;
@@ -41,6 +45,7 @@ impl<T: Config> Pallet<T> {
         hotkey: T::AccountId,
         netuid: NetUid,
         alpha_unstaked: AlphaBalance,
+        fee: Option<(T::AccountId, Permill)>,
     ) -> dispatch::DispatchResult {
         // 1. We check the transaction is signed by the caller and retrieve the T::AccountId coldkey information.
         let coldkey = ensure_signed(origin)?;
@@ -66,8 +71,8 @@ impl<T: Config> Pallet<T> {
             false,
         )?;
 
-        // 3. Swap the alpba to tao and update counters for this subnet.
-        Self::unstake_from_subnet(
+        // 3. Swap the alpha to tao and update counters for this subnet.
+        let tao_unstaked = Self::unstake_from_subnet(
             &hotkey,
             &coldkey,
             &coldkey,
@@ -76,6 +81,14 @@ impl<T: Config> Pallet<T> {
             T::SwapInterface::min_price(),
             false,
         )?;
+
+        // 4. Deduct fee from TAO output if requested.
+        if let Some((fee_recipient, fee_percentage)) = fee {
+            let fee_amount: u64 = fee_percentage * u64::from(tao_unstaked);
+            if fee_amount > 0 {
+                Self::transfer_tao(&coldkey, &fee_recipient, fee_amount.into())?;
+            }
+        }
 
         // 5. If the stake is below the minimum, we clear the nomination from storage.
         Self::clear_small_nomination_if_required(&hotkey, &coldkey, netuid);
@@ -421,7 +434,7 @@ impl<T: Config> Pallet<T> {
         if let Some(limit_price) = limit_price {
             Self::do_remove_stake_limit(origin, hotkey, netuid, alpha_unstaked, limit_price, false)
         } else {
-            Self::do_remove_stake(origin, hotkey, netuid, alpha_unstaked)
+            Self::do_remove_stake(origin, hotkey, netuid, alpha_unstaked, None)
         }
     }
 
